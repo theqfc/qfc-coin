@@ -31,7 +31,6 @@ MIN_YIELD_BALANCE = 500.0
 YIELD_INTERVAL_SECONDS = 2_592_000
 POOL_BONUS_THRESHOLD = 10.0
 GAS_FEE_PERCENT = 0.01
-MIN_LIQUIDITY_RESERVE = 100.0
 
 TREASURY_PATH = "/op-console-9x7k2m4p8q"
 
@@ -68,6 +67,15 @@ def calculate_mining_interval():
     scarcity_factor = 1.0 - supply_ratio
     interval_seconds = 1800 - (demand_factor * 900) + (scarcity_factor * 900)
     return max(600, min(3600, int(interval_seconds)))
+
+def get_adaptive_min_reserve():
+    """Intelligent adaptive liquidity reserve that grows with the system"""
+    live_price = min(0.50, 0.01 * (1 + (1 - treasury_balance / TOTAL_SUPPLY_CAP) * 1.5))
+    base = 250.0
+    treasury_pct = treasury_usd * 0.07
+    circulation_ratio = (TOTAL_SUPPLY_CAP - treasury_balance) / TOTAL_SUPPLY_CAP
+    circulation_protection = treasury_usd * circulation_ratio * 0.03
+    return max(base, treasury_pct + circulation_protection)
 
 def load_state():
     global treasury_balance, treasury_usd, chain_height, holder_reward_pool, current_block_reward, recent_buy_volume, LAST_YIELD_TIME, LAST_AUTO_MINE_TIME, radar_history
@@ -153,13 +161,36 @@ async def auto_pool_bonus_task():
             holder_reward_pool = 0.0
             save_state()
 
+async def perform_mine():
+    global chain_height, holder_reward_pool, current_block_reward, treasury_balance, LAST_AUTO_MINE_TIME, recent_buy_volume
+    chain_height += 1
+    treasury_share = current_block_reward * TREASURY_MINING_SHARE
+    holder_share = current_block_reward * HOLDER_MINING_SHARE
+    treasury_balance += treasury_share
+    holder_reward_pool += holder_share
+    if chain_height % HALVING_INTERVAL == 0:
+        current_block_reward = max(0.000001, current_block_reward / 2)
+    LAST_AUTO_MINE_TIME = time.time()
+    recent_buy_volume = 0.0
+    transactions.append({"type": "mined", "amount": current_block_reward, "time": time.strftime("%Y-%m-%d %H:%M"), "to": "Treasury + Holder Pool"})
+    save_state()
+    print(f"✅ AUTO-MINE FIRED — Block {chain_height}")
+
+async def auto_mine_task():
+    while True:
+        await asyncio.sleep(60)
+        if time.time() - LAST_AUTO_MINE_TIME >= calculate_mining_interval():
+            await perform_mine()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield_task = asyncio.create_task(auto_yield_task())
     pool_task = asyncio.create_task(auto_pool_bonus_task())
+    mine_task = asyncio.create_task(auto_mine_task())
     yield
     yield_task.cancel()
     pool_task.cancel()
+    mine_task.cancel()
 
 app = FastAPI(title="QuantumForge Coin", lifespan=lifespan)
 
@@ -247,7 +278,7 @@ async def landing():
     """
     return HTMLResponse(html)
 
-# ====================== FULL WALLET HTML — MOBILE OPTIMIZED (entry hero + main wallet) ======================
+# ====================== FULL WALLET HTML — MOBILE OPTIMIZED ======================
 @app.get("/wallet", response_class=HTMLResponse)
 async def wallet():
     html = """<!DOCTYPE html>
@@ -278,7 +309,6 @@ async def wallet():
     </style>
 </head>
 <body class="p-4 md:p-8 max-w-5xl mx-auto">
-    <!-- ENTRY HERO — FULLY MOBILE RESPONSIVE -->
     <div id="entry_hero" class="hero py-12 md:py-20 text-center rounded-3xl mb-8">
         <div class="max-w-4xl mx-auto px-4 md:px-8">
             <img src="https://lh3.googleusercontent.com/d/1KL5twf6dD9waLSnfXFeJ2FurE5xwljqF" alt="QuantumForge Coin" class="coin mx-auto w-56 md:w-72 lg:w-96 mb-8">
@@ -291,7 +321,6 @@ async def wallet():
         </div>
     </div>
 
-    <!-- NEW WALLET MODAL -->
     <div id="new_wallet_modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
         <div class="card max-w-lg w-full mx-4">
             <h2 class="accent text-2xl mb-6 text-center">⚠️ STORE THIS SECURELY OFFLINE</h2>
@@ -309,7 +338,6 @@ async def wallet():
         </div>
     </div>
 
-    <!-- RECOVER MODAL -->
     <div id="recover_modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
         <div class="card max-w-md w-full mx-4">
             <h2 class="accent text-2xl mb-6 text-center">Recover Wallet</h2>
@@ -320,7 +348,6 @@ async def wallet():
         </div>
     </div>
 
-    <!-- MAIN WALLET CONTENT — MOBILE OPTIMIZED -->
     <div id="wallet_content" class="hidden space-y-8">
         <div class="card flex flex-col md:flex-row justify-between items-start gap-6">
             <div class="flex-1">
@@ -401,7 +428,6 @@ async def wallet():
         </div>
     </div>
 
-    <!-- SCANNER MODAL -->
     <div id="scanner_modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
         <div class="card max-w-lg w-full mx-4">
             <div id="reader" style="width:100%;height:300px"></div>
@@ -772,7 +798,7 @@ async def wallet():
     """
     return HTMLResponse(html)
 
-# ====================== TREASURY HTML (100% unchanged) ======================
+# ====================== TREASURY HTML (updated to show adaptive reserve) ======================
 TREASURY_HTML = """
 <!DOCTYPE html>
 <html>
@@ -846,6 +872,12 @@ TREASURY_HTML = """
         <p>Next Halving at Block: <span id="next_halving" class="accent">735</span></p>
     </div>
 
+    <div class="card">
+        <h3 class="accent text-2xl mb-4">Adaptive Liquidity Reserve (Intelligent Protection)</h3>
+        <div id="adaptive_reserve" class="text-4xl font-bold accent">$250.00</div>
+        <p class="text-sm opacity-70">Minimum protected USD balance (scales automatically with treasury health)</p>
+    </div>
+
     <div class="grid grid-cols-2 gap-6">
         <button onclick="mineBlock()" class="card py-10 text-2xl font-bold bg-emerald-500 hover:bg-emerald-600 text-black rounded-3xl">Mine Block (+25 QFC)<br><small>70% Treasury • 30% Holder Pool</small></button>
         <button onclick="distributeYield()" class="card py-10 text-2xl font-bold bg-amber-500 hover:bg-amber-600 text-black rounded-3xl">Force Monthly Distribution</button>
@@ -859,7 +891,7 @@ TREASURY_HTML = """
         <input id="withdraw_amount" type="number" step="0.01" placeholder="Amount to Withdraw (USD)" class="w-full px-6 py-4 rounded-2xl text-xl mb-4">
         <input id="withdraw_pin" type="password" maxlength="14" placeholder="Enter Treasury PIN" class="w-full px-6 py-4 rounded-2xl text-xl mb-4">
         <button onclick="withdrawProfit()" class="w-full py-6 bg-red-600 hover:bg-red-700 text-white font-bold rounded-3xl">SAFE WITHDRAW PROFIT → BANK</button>
-        <p class="text-xs opacity-70 mt-4">Only profit above $100 reserve can be withdrawn.</p>
+        <p class="text-xs opacity-70 mt-4">Only profit above the adaptive minimum reserve can be withdrawn.</p>
     </div>
 
     <div class="card">
@@ -940,8 +972,9 @@ TREASURY_HTML = """
         });
         document.getElementById('history').innerHTML = html || '<p class="opacity-50">No transactions yet</p>';
 
-        const available = Math.max(0, parseFloat(data.treasury_usd || 0) - 100);
+        const available = Math.max(0, parseFloat(data.treasury_usd || 0) - parseFloat(data.adaptive_reserve || 250));
         document.getElementById('available_profit').innerText = '$' + available.toFixed(2);
+        document.getElementById('adaptive_reserve').innerText = '$' + parseFloat(data.adaptive_reserve || 250).toFixed(2);
     }
 
     async function mineBlock() { await fetch('/mine',{method:'POST'}); updateUI(); }
@@ -1084,7 +1117,7 @@ async def stripe_webhook(request: Request):
 
     return JSONResponse({"status": "success"})
 
-# ====================== WITHDRAW ENDPOINTS ======================
+# ====================== WITHDRAW ENDPOINTS (now uses adaptive reserve) ======================
 @app.post("/withdraw")
 async def withdraw(usd: float = Form(...), wallet_address: str = Form(...)):
     if wallet_usd_balances.get(wallet_address, 0) < usd:
@@ -1109,8 +1142,9 @@ async def withdraw(usd: float = Form(...), wallet_address: str = Form(...)):
 @app.post("/withdraw_profit")
 async def withdraw_profit(amount: float = Form(...)):
     global treasury_usd
-    if treasury_usd - amount < MIN_LIQUIDITY_RESERVE:
-        return {"message": "Cannot withdraw - would go below liquidity reserve"}
+    min_reserve = get_adaptive_min_reserve()
+    if treasury_usd - amount < min_reserve:
+        return {"message": f"Cannot withdraw — would go below adaptive minimum reserve of ${min_reserve:.2f}"}
     treasury_usd -= amount
     transactions.append({"type": "treasury_withdrawal", "usd": amount, "time": time.strftime("%Y-%m-%d %H:%M")})
     save_state()
@@ -1214,23 +1248,14 @@ async def get_state():
         "last_auto_mine_time": LAST_AUTO_MINE_TIME,
         "mining_interval": calculate_mining_interval(),
         "holder_reward_pool": holder_reward_pool,
-        "current_block_reward": current_block_reward
+        "current_block_reward": current_block_reward,
+        "adaptive_reserve": get_adaptive_min_reserve()
     }
 
 @app.post("/mine")
 async def api_mine():
-    global chain_height, holder_reward_pool, current_block_reward, treasury_balance, LAST_AUTO_MINE_TIME
-    chain_height += 1
-    treasury_share = current_block_reward * TREASURY_MINING_SHARE
-    holder_share = current_block_reward * HOLDER_MINING_SHARE
-    treasury_balance += treasury_share
-    holder_reward_pool += holder_share
-    if chain_height % HALVING_INTERVAL == 0:
-        current_block_reward = max(0.000001, current_block_reward / 2)
-    LAST_AUTO_MINE_TIME = time.time()
-    transactions.append({"type": "mined", "amount": current_block_reward, "time": time.strftime("%Y-%m-%d %H:%M"), "to": "Treasury + Holder Pool"})
-    save_state()
-    return {"message": f"Block mined — {treasury_share:.1f} to Treasury, {holder_share:.1f} to Holder Pool"}
+    await perform_mine()
+    return {"message": f"Block mined — manual trigger successful"}
 
 @app.post("/yield")
 async def api_yield():
