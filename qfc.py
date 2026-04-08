@@ -14,6 +14,13 @@ from typing import Dict, List
 
 app = FastAPI(title="QuantumForge Coin")
 
+# ==================== ENVIRONMENT VARIABLES WITH LOCAL FALLBACK ====================
+STRIPE_API_KEY = os.getenv("STRIPE_API_KEY", "sk_test_51TJIWDCLs3QhIrfWzBIuNbfBeIJZ8EP5ehWKhecN0OAeHlKkhYo25jmzabUiXv6QNRztaQ0PlOMJFPtywsWhnS1l00AHWqQEq9")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_oUbfUZw9XvkoAYzThbcciY5RUtijqN6D")
+TREASURY_PASSWORD = os.getenv("TREASURY_PASSWORD", "79369943077973")
+
+stripe.api_key = STRIPE_API_KEY
+
 # ==================== CONFIG ====================
 TOTAL_SUPPLY_CAP = 21_000_000
 GENESIS_TREASURY_AMOUNT = 10_500_000.0
@@ -27,11 +34,6 @@ GAS_FEE_PERCENT = 0.01
 MIN_LIQUIDITY_RESERVE = 100.0
 
 TREASURY_PATH = "/op-console-9x7k2m4p8q"
-TREASURY_PASSWORD = "79369943077973"
-
-# ==================== STRIPE ====================
-stripe.api_key = "sk_test_51TJIWDCLs3QhIrfWzBIuNbfBeIJZ8EP5ehWKhecN0OAeHlKkhYo25jmzabUiXv6QNRztaQ0PlOMJFPtywsWhnS1l00AHWqQEq9"
-STRIPE_WEBHOOK_SECRET = "whsec_oUbfUZw9XvkoAYzThbcciY5RUtijqN6D"
 
 my_addr = "d0ff5d049bcc4ecf176b7523901a1f4c0a429d98285966ca1919ceb0291b2638"
 treasury_balance = GENESIS_TREASURY_AMOUNT
@@ -999,7 +1001,7 @@ async def stripe_webhook(request: Request):
 
     return JSONResponse({"status": "success"})
 
-# ====================== WITHDRAW ENDPOINTS (TEST-MODE FRIENDLY) ======================
+# ====================== WITHDRAW ENDPOINTS ======================
 @app.post("/withdraw")
 async def withdraw(usd: float = Form(...), wallet_address: str = Form(...)):
     if wallet_usd_balances.get(wallet_address, 0) < usd:
@@ -1212,9 +1214,10 @@ async def export_wallet():
     return FileResponse(temp_file, filename="my_qfc_wallet.json", media_type="application/json")
 
 if __name__ == "__main__":
-    print("\n🌐 QuantumForge Coin — FULLY FIXED & SUPERCHARGED")
-    print("✅ Withdrawals now show friendly test-mode message")
-    print("✅ All internal accounting works perfectly")
+    print("\n🌐 QuantumForge Coin — READY FOR RAILWAY")
     print("Wallet: http://127.0.0.1:8000/wallet")
     print(f"Treasury: http://127.0.0.1:8000{TREASURY_PATH}?pw={TREASURY_PASSWORD}")
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    
+    # Railway automatically gives us a PORT variable
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
