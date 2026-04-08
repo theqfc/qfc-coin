@@ -43,6 +43,8 @@ current_block_reward = INITIAL_BLOCK_REWARD
 transactions: List[Dict] = []
 wallet_balances: Dict[str, float] = {my_addr: 500110.077680}
 wallet_usd_balances: Dict[str, float] = {my_addr: 100.0}
+wallet_last_buy_time: Dict[str, float] = {}   # NEW: anti-sandbag tracking
+recent_sell_volume = 0.0                       # NEW: dump-pressure tracking
 
 LAST_YIELD_TIME = time.time() - 60
 LAST_AUTO_MINE_TIME = time.time() - 600
@@ -78,7 +80,7 @@ def get_adaptive_min_reserve():
     return max(base, treasury_pct + circulation_protection)
 
 def load_state():
-    global treasury_balance, treasury_usd, chain_height, holder_reward_pool, current_block_reward, recent_buy_volume, LAST_YIELD_TIME, LAST_AUTO_MINE_TIME, radar_history
+    global treasury_balance, treasury_usd, chain_height, holder_reward_pool, current_block_reward, recent_buy_volume, LAST_YIELD_TIME, LAST_AUTO_MINE_TIME, radar_history, wallet_last_buy_time, recent_sell_volume
     if os.path.exists("state.json"):
         try:
             with open("state.json") as f:
@@ -92,6 +94,8 @@ def load_state():
                 LAST_YIELD_TIME = data.get("last_yield_time", LAST_YIELD_TIME)
                 LAST_AUTO_MINE_TIME = data.get("last_auto_mine_time", LAST_AUTO_MINE_TIME)
                 radar_history = data.get("radar_history", [])
+                wallet_last_buy_time = data.get("wallet_last_buy_time", {})
+                recent_sell_volume = data.get("recent_sell_volume", 0.0)
                 transactions.clear()
                 transactions.extend(data.get("transactions", []))
                 wallet_balances.update(data.get("wallet_balances", {}))
@@ -116,7 +120,9 @@ def save_state():
                 "radar_history": radar_history[-800:],
                 "transactions": transactions[-100:],
                 "wallet_balances": wallet_balances,
-                "wallet_usd_balances": wallet_usd_balances
+                "wallet_usd_balances": wallet_usd_balances,
+                "wallet_last_buy_time": wallet_last_buy_time,
+                "recent_sell_volume": recent_sell_volume
             }, f, indent=2)
     except Exception as e:
         print(f"[SAVE STATE ERROR] {e}")
@@ -125,26 +131,39 @@ load_state()
 
 # ====================== AUTO TASKS ======================
 async def auto_yield_task():
-    global treasury_balance, LAST_YIELD_TIME
+    global treasury_balance, LAST_YIELD_TIME, recent_sell_volume
     while True:
         await asyncio.sleep(YIELD_INTERVAL_SECONDS)
         if time.time() - LAST_YIELD_TIME < 30: continue
         if treasury_balance < 1000: continue
         live_price = min(0.50, 0.01 * (1 + (1 - treasury_balance / TOTAL_SUPPLY_CAP) * 1.5))
-        eligible = {addr: bal for addr, bal in wallet_balances.items() if bal >= MIN_YIELD_BALANCE}
+        
+        now = time.time()
+        # ANTI-SANDBAG: only wallets that bought within last 30 days are eligible
+        eligible = {addr: bal for addr, bal in wallet_balances.items() 
+                    if bal >= MIN_YIELD_BALANCE and wallet_last_buy_time.get(addr, 0) > now - YIELD_INTERVAL_SECONDS}
+        
         if not eligible:
             LAST_YIELD_TIME = time.time()
+            recent_sell_volume = 0.0
             continue
+            
         total_eligible = sum(eligible.values())
         dynamic_rate = MIN_YIELD_RATE + (MAX_YIELD_RATE - MIN_YIELD_RATE) * (1 - treasury_balance / TOTAL_SUPPLY_CAP)
-        monthly_pool = treasury_balance * min(dynamic_rate, TREASURY_MAX_MONTHLY_PCT)
+        
+        # SELF-HEALING DUMP PROTECTION: throttle yield if heavy selling detected
+        dump_factor = max(0.3, 1.0 - (recent_sell_volume / 10000))  # max 70% reduction if massive sells
+        monthly_pool = treasury_balance * min(dynamic_rate, TREASURY_MAX_MONTHLY_PCT) * dump_factor
+        
         for addr, bal in eligible.items():
             reward = (bal / total_eligible) * monthly_pool
             wallet_balances[addr] = wallet_balances.get(addr, 0) + reward
             usd_equiv = round(reward * live_price, 2)
             transactions.append({"type": "monthly_yield", "amount": round(reward, 6), "usd_value": usd_equiv, "time": time.strftime("%Y-%m-%d %H:%M"), "to": addr})
+        
         treasury_balance -= monthly_pool
         LAST_YIELD_TIME = time.time()
+        recent_sell_volume = 0.0   # reset after payout
         save_state()
 
 async def auto_pool_bonus_task():
@@ -152,7 +171,10 @@ async def auto_pool_bonus_task():
     while True:
         await asyncio.sleep(60)
         if holder_reward_pool < POOL_BONUS_THRESHOLD: continue
-        eligible = [addr for addr, bal in wallet_balances.items() if bal >= MIN_YIELD_BALANCE]
+        now = time.time()
+        # ANTI-SANDBAG for holder bonuses too
+        eligible = [addr for addr, bal in wallet_balances.items() 
+                    if bal >= MIN_YIELD_BALANCE and wallet_last_buy_time.get(addr, 0) > now - YIELD_INTERVAL_SECONDS]
         if eligible:
             share = holder_reward_pool / len(eligible)
             for addr in eligible:
@@ -1192,6 +1214,8 @@ async def buy_qfc(usd: float = Form(...), buyer_address: str = Form(None)):
     wallet_balances[buyer] = wallet_balances.get(buyer, 0.0) + qfc_amount
     wallet_usd_balances[buyer] = current_usd - usd
     recent_buy_volume += usd
+    # ANTI-SANDBAG: record buy activity time
+    wallet_last_buy_time[buyer] = time.time()
     transactions.append({"type": "buy", "usd": usd, "qfc": qfc_amount, "gas": gas, "to": buyer, "time": time.strftime("%Y-%m-%d %H:%M")})
     save_state()
     return {"message": f"✅ Bought {qfc_amount} QFC for ${usd} (1% gas ${gas} to Treasury)"}
@@ -1199,7 +1223,7 @@ async def buy_qfc(usd: float = Form(...), buyer_address: str = Form(None)):
 @app.post("/sell_qfc")
 async def sell_qfc(qfc: float = Form(...), seller_address: str = Form(None)):
     load_state()
-    global treasury_balance, treasury_usd
+    global treasury_balance, treasury_usd, recent_sell_volume
     if qfc <= 0: return {"message": "Invalid amount"}
     live_price = min(0.50, 0.01 * (1 + (1 - treasury_balance / TOTAL_SUPPLY_CAP) * 1.5))
     usd_amount = round(qfc * live_price, 2)
@@ -1212,6 +1236,7 @@ async def sell_qfc(qfc: float = Form(...), seller_address: str = Form(None)):
     treasury_balance += qfc
     treasury_usd -= usd_amount
     treasury_usd += gas
+    recent_sell_volume += usd_amount   # track for dump protection
     transactions.append({"type": "sell", "qfc": qfc, "usd": usd_amount, "gas": gas, "from": seller, "time": time.strftime("%Y-%m-%d %H:%M")})
     save_state()
     return {"message": f"✅ Sold {qfc} QFC for ${usd_amount} (1% gas ${gas} to Treasury)"}
@@ -1223,7 +1248,9 @@ async def api_send_from_treasury(recipient: str = Form(...), amount: float = For
         return {"message": "Insufficient funds"}
     treasury_balance -= amount
     wallet_balances[recipient] = wallet_balances.get(recipient, 0.0) + amount
-    # ONLY ONE TRANSACTION RECORD — this fixes the duplicate
+    # ANTI-SANDBAG: treat treasury send as acquisition activity
+    wallet_last_buy_time[recipient] = time.time()
+    # ONLY ONE TRANSACTION RECORD — duplicate fixed
     transactions.append({"type": "treasury_sent", "amount": amount, "to": recipient, "from": "QFC Treasury", "time": time.strftime("%Y-%m-%d %H:%M")})
     save_state()
     return {"message": f"✅ Sent {amount} QFC to wallet"}
@@ -1259,16 +1286,23 @@ async def api_mine():
 
 @app.post("/yield")
 async def api_yield():
-    global treasury_balance, LAST_YIELD_TIME
+    global treasury_balance, LAST_YIELD_TIME, recent_sell_volume
     if treasury_balance < 1000:
         return {"message": "Treasury too low"}
     live_price = min(0.50, 0.01 * (1 + (1 - treasury_balance / TOTAL_SUPPLY_CAP) * 1.5))
-    eligible = {addr: bal for addr, bal in wallet_balances.items() if bal >= MIN_YIELD_BALANCE}
+    now = time.time()
+    # ANTI-SANDBAG: only recent buyers eligible
+    eligible = {addr: bal for addr, bal in wallet_balances.items() 
+                if bal >= MIN_YIELD_BALANCE and wallet_last_buy_time.get(addr, 0) > now - YIELD_INTERVAL_SECONDS}
     if not eligible:
-        return {"message": "No eligible wallets"}
+        return {"message": "No eligible wallets (must have bought within last 30 days)"}
     total_eligible = sum(eligible.values())
     dynamic_rate = MIN_YIELD_RATE + (MAX_YIELD_RATE - MIN_YIELD_RATE) * (1 - treasury_balance / TOTAL_SUPPLY_CAP)
-    monthly_pool = treasury_balance * min(dynamic_rate, TREASURY_MAX_MONTHLY_PCT)
+    
+    # SELF-HEALING DUMP PROTECTION
+    dump_factor = max(0.3, 1.0 - (recent_sell_volume / 10000))
+    monthly_pool = treasury_balance * min(dynamic_rate, TREASURY_MAX_MONTHLY_PCT) * dump_factor
+    
     for addr, bal in eligible.items():
         reward = (bal / total_eligible) * monthly_pool
         wallet_balances[addr] = wallet_balances.get(addr, 0) + reward
@@ -1276,8 +1310,9 @@ async def api_yield():
         transactions.append({"type": "monthly_yield", "amount": round(reward, 6), "usd_value": usd_equiv, "time": time.strftime("%Y-%m-%d %H:%M"), "to": addr})
     treasury_balance -= monthly_pool
     LAST_YIELD_TIME = time.time()
+    recent_sell_volume = 0.0
     save_state()
-    return {"message": f"✅ Monthly Basic Income distributed to {len(eligible)} wallets (proportional to holdings)"}
+    return {"message": f"✅ Monthly Basic Income distributed to {len(eligible)} wallets (proportional to holdings) — dump protection applied"}
 
 @app.post("/airdrop")
 async def api_airdrop():
@@ -1287,6 +1322,7 @@ async def api_airdrop():
     for i in range(10):
         test_addr = f"test_wallet_{i}_{random.randint(1000,9999)}"
         wallet_balances[test_addr] = wallet_balances.get(test_addr, 0) + 5000
+        wallet_last_buy_time[test_addr] = time.time()  # count as activity
         transactions.append({"type": "airdrop", "amount": 5000, "to": test_addr, "time": time.strftime("%Y-%m-%d %H:%M")})
     save_state()
     return {"message": "Airdrop complete — 10 wallets received 5000 QFC each"}
@@ -1300,6 +1336,8 @@ async def api_send(sender: str = Form(...), recipient: str = Form(...), amount: 
         return {"message": "Cannot send to self"}
     wallet_balances[sender] -= amount
     wallet_balances[recipient] = wallet_balances.get(recipient, 0.0) + amount
+    # treat receive as activity for anti-sandbag
+    wallet_last_buy_time[recipient] = time.time()
     transactions.append({"type": "sent", "amount": amount, "from": sender, "to": recipient, "time": time.strftime("%Y-%m-%d %H:%M")})
     transactions.append({"type": "received", "amount": amount, "from": sender, "to": recipient, "time": time.strftime("%Y-%m-%d %H:%M")})
     save_state()
