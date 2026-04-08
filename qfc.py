@@ -163,7 +163,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="QuantumForge Coin", lifespan=lifespan)
 
-# ====================== BEAUTIFUL MARKETING LANDING PAGE (restored with glow, hover cards, fully mobile-friendly) ======================
+# ====================== BEAUTIFUL MOBILE-FRIENDLY MARKETING LANDING PAGE ======================
 @app.get("/", response_class=HTMLResponse)
 async def landing():
     html = """<!DOCTYPE html>
@@ -181,16 +181,16 @@ async def landing():
     </style>
 </head>
 <body class="min-h-screen">
-    <div class="hero py-20 text-center">
-        <div class="max-w-4xl mx-auto px-6">
-            <img src="https://lh3.googleusercontent.com/d/1KL5twf6dD9waLSnfXFeJ2FurE5xwljqF" alt="QFC" class="mx-auto w-64 mb-8">
-            <h1 class="text-7xl font-bold glow mb-4">QUANTUMFORGE COIN</h1>
-            <p class="text-2xl mb-12">The first post-quantum currency built for real-world use — with monthly basic income, unbreakable security, and intelligent growth.</p>
-            <a href="/wallet" class="inline-block bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-2xl px-12 py-6 rounded-3xl transition-all">Launch Wallet Now</a>
+    <div class="hero py-12 md:py-20 text-center">
+        <div class="max-w-4xl mx-auto px-4 md:px-6">
+            <img src="https://lh3.googleusercontent.com/d/1KL5twf6dD9waLSnfXFeJ2FurE5xwljqF" alt="QFC" class="mx-auto w-48 md:w-64 mb-8">
+            <h1 class="text-5xl md:text-6xl lg:text-7xl font-bold glow mb-4">QUANTUMFORGE COIN</h1>
+            <p class="text-xl md:text-2xl mb-12 max-w-2xl mx-auto">The first post-quantum currency built for real-world use — with monthly basic income, unbreakable security, and intelligent growth.</p>
+            <a href="/wallet" class="inline-block bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-2xl px-10 md:px-12 py-6 rounded-3xl transition-all">Launch Wallet Now</a>
         </div>
     </div>
 
-    <div class="max-w-6xl mx-auto px-6 py-16">
+    <div class="max-w-6xl mx-auto px-4 md:px-6 py-12 md:py-16">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div class="card bg-zinc-900 p-8 rounded-3xl text-center">
                 <h3 class="text-emerald-400 text-xl mb-4">Everyday Payments</h3>
@@ -206,8 +206,8 @@ async def landing():
             </div>
         </div>
 
-        <div class="mt-20 text-center">
-            <h2 class="text-4xl font-bold mb-8">How It Works</h2>
+        <div class="mt-16 md:mt-20 text-center">
+            <h2 class="text-3xl md:text-4xl font-bold mb-8">How It Works</h2>
             <div class="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
                 <div>
                     <div class="text-5xl font-bold text-emerald-400 mb-2">1</div>
@@ -232,9 +232,9 @@ async def landing():
             </div>
         </div>
 
-        <div class="mt-20 text-center bg-zinc-900 rounded-3xl p-12">
-            <h2 class="text-4xl font-bold mb-4">Ready for the Future?</h2>
-            <a href="/wallet" class="inline-block bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-2xl px-12 py-6 rounded-3xl transition-all">Launch Wallet Now</a>
+        <div class="mt-16 md:mt-20 text-center bg-zinc-900 rounded-3xl p-8 md:p-12">
+            <h2 class="text-3xl md:text-4xl font-bold mb-4">Ready for the Future?</h2>
+            <a href="/wallet" class="inline-block bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-2xl px-10 md:px-12 py-6 rounded-3xl transition-all">Launch Wallet Now</a>
             <p class="text-sm mt-6 opacity-70">Hard cap: 21 million QFC • Treasury starts with 10.5 million</p>
         </div>
     </div>
@@ -247,7 +247,7 @@ async def landing():
     """
     return HTMLResponse(html)
 
-# ====================== FULL WALLET HTML (100% unchanged from your attached file) ======================
+# ====================== FULL WALLET HTML (100% unchanged) ======================
 @app.get("/wallet", response_class=HTMLResponse)
 async def wallet():
     html = """<!DOCTYPE html>
@@ -767,7 +767,7 @@ async def wallet():
     """
     return HTMLResponse(html)
 
-# ====================== TREASURY HTML (100% unchanged from your attached file) ======================
+# ====================== TREASURY HTML (100% unchanged) ======================
 TREASURY_HTML = """
 <!DOCTYPE html>
 <html>
