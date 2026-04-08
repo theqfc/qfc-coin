@@ -1223,8 +1223,8 @@ async def api_send_from_treasury(recipient: str = Form(...), amount: float = For
         return {"message": "Insufficient funds"}
     treasury_balance -= amount
     wallet_balances[recipient] = wallet_balances.get(recipient, 0.0) + amount
+    # ONLY ONE TRANSACTION RECORD — this fixes the duplicate
     transactions.append({"type": "treasury_sent", "amount": amount, "to": recipient, "from": "QFC Treasury", "time": time.strftime("%Y-%m-%d %H:%M")})
-    transactions.append({"type": "received", "amount": amount, "from": "QFC Treasury", "to": recipient, "time": time.strftime("%Y-%m-%d %H:%M")})
     save_state()
     return {"message": f"✅ Sent {amount} QFC to wallet"}
 
