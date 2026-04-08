@@ -247,7 +247,7 @@ async def landing():
     """
     return HTMLResponse(html)
 
-# ====================== FULL WALLET HTML (100% unchanged) ======================
+# ====================== FULL WALLET HTML — MOBILE OPTIMIZED (entry hero + main wallet) ======================
 @app.get("/wallet", response_class=HTMLResponse)
 async def wallet():
     html = """<!DOCTYPE html>
@@ -265,31 +265,33 @@ async def wallet():
         .glow-text { text-shadow: 0 0 30px #00ff88, 0 0 60px #00ff88, 0 0 90px rgba(0,255,136,0.6); }
         .coin { filter: drop-shadow(0 0 80px rgba(0,255,136,0.8)); transition: transform 0.8s ease; }
         .coin:hover { transform: rotate(8deg) scale(1.06); }
-        .card { background: #111827; border: 2px solid #00ff88; border-radius: 24px; padding: 32px; margin-bottom: 24px; }
+        .card { background: #111827; border: 2px solid #00ff88; border-radius: 24px; padding: 24px; margin-bottom: 24px; }
         .accent { color: #00ff88; }
         .keybox { font-family: monospace; background: #1a1a2e; padding: 16px; border-radius: 12px; word-break: break-all; font-size: 13px; }
         .tx-item { background: #1a2338; padding: 14px; border-radius: 12px; margin-bottom: 8px; cursor: pointer; }
         .tx-item:hover { background: #25314f; }
         .copy-addr { color: #00ff88; text-decoration: underline; cursor: pointer; }
-        .range-btn { padding: 6px 12px; margin: 0 4px; border-radius: 9999px; background: #1a2338; color: #e0ffe0; cursor: pointer; }
+        .range-btn { padding: 6px 12px; margin: 0 4px; border-radius: 9999px; background: #1a2338; color: #e0ffe0; cursor: pointer; font-size: 14px; }
         .range-btn.active { background: #00ff88; color: #111827; font-weight: bold; }
         .success-toast { animation: popIn 0.4s ease; }
         @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     </style>
 </head>
-<body class="p-8 max-w-5xl mx-auto">
-    <div id="entry_hero" class="hero py-20 text-center rounded-3xl mb-12">
-        <div class="max-w-4xl mx-auto px-8">
-            <img src="https://lh3.googleusercontent.com/d/1KL5twf6dD9waLSnfXFeJ2FurE5xwljqF" alt="QuantumForge Coin" class="coin mx-auto w-72 md:w-96 mb-12">
-            <h1 class="text-6xl font-bold glow-text mb-6">QuantumForge Wallet</h1>
-            <p class="text-2xl mb-12 opacity-90">Post-quantum security with monthly basic income from the treasury</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-md mx-auto">
-                <button onclick="createNewWallet()" class="py-8 bg-emerald-500 hover:bg-emerald-600 text-black font-bold rounded-3xl text-2xl transition-all">Create New Wallet</button>
-                <button onclick="showRecover()" class="py-8 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-3xl text-2xl transition-all">Recover Existing Wallet</button>
+<body class="p-4 md:p-8 max-w-5xl mx-auto">
+    <!-- ENTRY HERO — FULLY MOBILE RESPONSIVE -->
+    <div id="entry_hero" class="hero py-12 md:py-20 text-center rounded-3xl mb-8">
+        <div class="max-w-4xl mx-auto px-4 md:px-8">
+            <img src="https://lh3.googleusercontent.com/d/1KL5twf6dD9waLSnfXFeJ2FurE5xwljqF" alt="QuantumForge Coin" class="coin mx-auto w-56 md:w-72 lg:w-96 mb-8">
+            <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold glow-text mb-4">QuantumForge Wallet</h1>
+            <p class="text-lg md:text-2xl mb-10 md:mb-12 opacity-90">Post-quantum security with monthly basic income from the treasury</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-md mx-auto">
+                <button onclick="createNewWallet()" class="py-7 bg-emerald-500 hover:bg-emerald-600 text-black font-bold rounded-3xl text-2xl transition-all">Create New Wallet</button>
+                <button onclick="showRecover()" class="py-7 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-3xl text-2xl transition-all">Recover Existing Wallet</button>
             </div>
         </div>
     </div>
 
+    <!-- NEW WALLET MODAL -->
     <div id="new_wallet_modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
         <div class="card max-w-lg w-full mx-4">
             <h2 class="accent text-2xl mb-6 text-center">⚠️ STORE THIS SECURELY OFFLINE</h2>
@@ -307,6 +309,7 @@ async def wallet():
         </div>
     </div>
 
+    <!-- RECOVER MODAL -->
     <div id="recover_modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
         <div class="card max-w-md w-full mx-4">
             <h2 class="accent text-2xl mb-6 text-center">Recover Wallet</h2>
@@ -317,16 +320,17 @@ async def wallet():
         </div>
     </div>
 
+    <!-- MAIN WALLET CONTENT — MOBILE OPTIMIZED -->
     <div id="wallet_content" class="hidden space-y-8">
-        <div class="card flex justify-between items-start gap-6">
+        <div class="card flex flex-col md:flex-row justify-between items-start gap-6">
             <div class="flex-1">
                 <p class="opacity-70 text-sm">Your Balance</p>
-                <div id="balance" class="text-6xl font-bold accent">0.000000</div>
-                <p class="text-3xl">QFC</p>
-                <div id="qfc_value" class="text-2xl text-amber-400 mt-1">Cash Value: $0.00</div>
-                <div id="usd_balance" class="text-3xl text-emerald-400 mt-3">$0.00 CASH</div>
+                <div id="balance" class="text-5xl md:text-6xl font-bold accent">0.000000</div>
+                <p class="text-2xl md:text-3xl">QFC</p>
+                <div id="qfc_value" class="text-xl md:text-2xl text-amber-400 mt-1">Cash Value: $0.00</div>
+                <div id="usd_balance" class="text-2xl md:text-3xl text-emerald-400 mt-3">$0.00 CASH</div>
             </div>
-            <div class="flex flex-col gap-3 pt-2">
+            <div class="flex flex-col gap-3 pt-2 w-full md:w-auto">
                 <button onclick="manualRefresh()" class="px-8 py-4 bg-zinc-700 hover:bg-zinc-600 rounded-2xl font-bold flex items-center gap-2 justify-center">🔄 Refresh</button>
                 <button onclick="exportWallet()" class="px-8 py-4 bg-zinc-700 hover:bg-zinc-600 rounded-2xl font-bold flex items-center gap-2 justify-center">📤 Export Wallet</button>
                 <button onclick="addFunds()" class="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold flex items-center gap-2 justify-center">💵 Add Funds</button>
@@ -336,9 +340,9 @@ async def wallet():
 
         <div class="card">
             <h3 class="accent text-2xl mb-4">Live QFC Price (USD)</h3>
-            <div id="wallet_live_price" class="text-6xl font-bold accent mb-4">$0.01</div>
+            <div id="wallet_live_price" class="text-5xl md:text-6xl font-bold accent mb-4">$0.01</div>
             <canvas id="walletRadarChart" height="180"></canvas>
-            <div class="flex justify-center mt-4">
+            <div class="flex justify-center mt-4 flex-wrap gap-2">
                 <span onclick="setRange(1)" class="range-btn" id="btn-1">1h</span>
                 <span onclick="setRange(24)" class="range-btn active" id="btn-24">24h</span>
                 <span onclick="setRange(168)" class="range-btn" id="btn-168">7d</span>
@@ -397,6 +401,7 @@ async def wallet():
         </div>
     </div>
 
+    <!-- SCANNER MODAL -->
     <div id="scanner_modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
         <div class="card max-w-lg w-full mx-4">
             <div id="reader" style="width:100%;height:300px"></div>
