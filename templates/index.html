@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QuantumForge Coin</title>
+    <style>
+        body { font-family: Arial; background: #111; color: #0f0; padding: 20px; }
+        .card { background: #1a1a2e; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        button { padding: 12px 20px; margin: 5px; background: #0f0; color: black; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🔨 QuantumForge Coin Dashboard</h1>
+    
+    <div class="card">
+        <strong>Your Address:</strong> {{ my_addr }}<br>
+        <strong>Your Balance:</strong> {{ balance }} QFC<br>
+        <strong>Treasury:</strong> {{ treasury }} QFC<br>
+        <strong>Chain Height:</strong> {{ chain_height }} blocks
+    </div>
+
+    <div class="card">
+        <button onclick="mineBlock()">Mine New Block</button>
+        <button onclick="distributeYield()">Distribute Monthly Yield</button>
+    </div>
+
+    <div id="status" style="margin-top: 20px; padding: 10px; background: #222;"></div>
+
+    <script>
+    async function mineBlock() {
+        const res = await fetch('/mine', {method: 'POST'});
+        const data = await res.json();
+        document.getElementById('status').innerHTML = data.message || data.status;
+    }
+    async function distributeYield() {
+        const res = await fetch('/yield', {method: 'POST'});
+        const data = await res.json();
+        document.getElementById('status').innerHTML = data.message || data.status;
+    }
+    </script>
+</body>
+</html>
