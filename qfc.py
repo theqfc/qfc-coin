@@ -163,7 +163,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="QuantumForge Coin", lifespan=lifespan)
 
-# ====================== MAIN MARKETING LANDING PAGE ======================
+# ====================== BEAUTIFUL MARKETING LANDING PAGE (restored with glow, hover cards, fully mobile-friendly) ======================
 @app.get("/", response_class=HTMLResponse)
 async def landing():
     html = """<!DOCTYPE html>
@@ -175,7 +175,9 @@ async def landing():
     <style>
         body { background: #0a0a1f; color: #e0ffe0; font-family: system-ui, sans-serif; }
         .hero { background: linear-gradient(135deg, #0a0a1f, #1a1a2e); }
-        .glow { text-shadow: 0 0 40px #00ff88; }
+        .glow { text-shadow: 0 0 60px #00ff88, 0 0 100px #00ff88; }
+        .card { transition: all 0.3s ease; }
+        .card:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgb(0 255 136 / 0.2); }
     </style>
 </head>
 <body class="min-h-screen">
@@ -190,15 +192,15 @@ async def landing():
 
     <div class="max-w-6xl mx-auto px-6 py-16">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div class="bg-zinc-900 p-8 rounded-3xl text-center">
+            <div class="card bg-zinc-900 p-8 rounded-3xl text-center">
                 <h3 class="text-emerald-400 text-xl mb-4">Everyday Payments</h3>
                 <p>Send and receive QFC instantly for goods, services, bills, or peer-to-peer transfers. Simple QR scanning makes it easier than cash or cards.</p>
             </div>
-            <div class="bg-zinc-900 p-8 rounded-3xl text-center">
+            <div class="card bg-zinc-900 p-8 rounded-3xl text-center">
                 <h3 class="text-emerald-400 text-xl mb-4">Monthly Basic Income</h3>
                 <p>Hold QFC and automatically receive proportional yield from the global treasury every 30 days — real passive income that rewards participation.</p>
             </div>
-            <div class="bg-zinc-900 p-8 rounded-3xl text-center">
+            <div class="card bg-zinc-900 p-8 rounded-3xl text-center">
                 <h3 class="text-emerald-400 text-xl mb-4">Post-Quantum Security</h3>
                 <p>The Phantom Jumper Key system morphs your private key with every block. Attacks have no fixed target — the most advanced security ever built into a currency.</p>
             </div>
@@ -206,11 +208,27 @@ async def landing():
 
         <div class="mt-20 text-center">
             <h2 class="text-4xl font-bold mb-8">How It Works</h2>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
-                <div><div class="text-5xl font-bold text-emerald-400 mb-2">1</div><p class="font-bold">Create Wallet</p><p class="text-sm opacity-70">Generate a unique seed + PIN to be secure. Fully self-custodial.</p></div>
-                <div><div class="text-5xl font-bold text-emerald-400 mb-2">2</div><p class="font-bold">Phantom Morphing</p><p class="text-sm opacity-70">Your key morphs with every block — quantum-resistant security.</p></div>
-                <div><div class="text-5xl font-bold text-emerald-400 mb-2">3</div><p class="font-bold">Earn Monthly</p><p class="text-sm opacity-70">Hold QFC and receive basic income from the treasury every 30 days.</p></div>
-                <div><div class="text-5xl font-bold text-emerald-400 mb-2">4</div><p class="font-bold">Send & Receive</p><p class="text-sm opacity-70">Instant peer-to-peer transfers with built-in QR scanning.</p></div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
+                <div>
+                    <div class="text-5xl font-bold text-emerald-400 mb-2">1</div>
+                    <p class="font-bold">Create Wallet</p>
+                    <p class="text-sm opacity-70">Generate a unique seed + PIN to be secure. Fully self-custodial.</p>
+                </div>
+                <div>
+                    <div class="text-5xl font-bold text-emerald-400 mb-2">2</div>
+                    <p class="font-bold">Phantom Morphing</p>
+                    <p class="text-sm opacity-70">Your key morphs with every block — quantum-resistant security.</p>
+                </div>
+                <div>
+                    <div class="text-5xl font-bold text-emerald-400 mb-2">3</div>
+                    <p class="font-bold">Earn Monthly</p>
+                    <p class="text-sm opacity-70">Hold QFC and receive basic income from the treasury every 30 days.</p>
+                </div>
+                <div>
+                    <div class="text-5xl font-bold text-emerald-400 mb-2">4</div>
+                    <p class="font-bold">Send & Receive</p>
+                    <p class="text-sm opacity-70">Instant peer-to-peer transfers with built-in QR scanning.</p>
+                </div>
             </div>
         </div>
 
@@ -229,7 +247,7 @@ async def landing():
     """
     return HTMLResponse(html)
 
-# ====================== FULL WALLET HTML ======================
+# ====================== FULL WALLET HTML (100% unchanged from your attached file) ======================
 @app.get("/wallet", response_class=HTMLResponse)
 async def wallet():
     html = """<!DOCTYPE html>
@@ -749,7 +767,7 @@ async def wallet():
     """
     return HTMLResponse(html)
 
-# ====================== TREASURY HTML ======================
+# ====================== TREASURY HTML (100% unchanged from your attached file) ======================
 TREASURY_HTML = """
 <!DOCTYPE html>
 <html>
@@ -1275,7 +1293,7 @@ async def export_wallet():
 
 if __name__ == "__main__":
     print("\n🌐 QuantumForge Coin — LIVE ON RAILWAY")
-    print("Main landing page: http://127.0.0.1:8000")
+    print("Main landing: http://127.0.0.1:8000")
     print("Wallet: http://127.0.0.1:8000/wallet")
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
